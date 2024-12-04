@@ -32,6 +32,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "lidar_X2_driver.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -62,6 +64,9 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+
+extern uint8_t LidarUartFlag;
+extern UART_HandleTypeDef huart3;
 
 HAL_StatusTypeDef status;
 
@@ -134,11 +139,13 @@ int main(void)
 	MX_ADC1_Init();
 	MX_TIM2_Init();
 	MX_TIM6_Init();
+	MX_TIM16_Init();
+	MX_TIM1_Init();
 	/* USER CODE BEGIN 2 */
 
 	printf("Starting DMA... \r\n");
 
-	HAL_TIM_Base_Start(&htim6);
+	HAL_TIM_Base_Start(&htim16);
 	HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
 	if (HAL_OK != HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_buffer, ADC_BUF_SIZE))
 	{
@@ -149,35 +156,53 @@ int main(void)
 	uint32_t lastTick = HAL_GetTick();
 	const uint32_t PRINT_INTERVAL = 1000;
 
+	lidar_point_t current_point;
+	uint8_t lidar_initialized = 0;
+
+	/*
+	while (!lidar_initialized)
+	{
+		lidar_initialized = init_lidar();
+		printf("lidar init code: %i \r\n", lidar_initialized);
+	}
+	printf("FullyInit\r\n");
+
+	 */
+
+
+
+	uint8_t rxBuffer[32];
+	lidar_point_t point = {0};
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
 	while (1)
 	{
-		uint32_t currentTick = HAL_GetTick();
 
-		if(currentTick - lastTick >= PRINT_INTERVAL)
+		//lidar_scan_loop();
+		status = HAL_UART_Receive(&huart3, rxBuffer, 32, 1000);
+		HAL_Delay(10);
+		if(rxBuffer[0] == 0xAA && rxBuffer[1] == 0x55)
 		{
-			Current_Measure_t measure;
+			uint8_t sample = rxBuffer[3];
+			uint8_t sampleData[sample*2];
+			memcpy(sampleData, &rxBuffer[10], sample*2);
+			point = lidar_DataProcessing(sampleData, sample);
 
-			// Copie sécurisée des données
-			__disable_irq();
-			measure = currentMeasure;
-			__enable_irq();
+			printf("Distance: %.2f mm, Angle: %.2f°\r\n",
+					point.distance,
+					point.angle);
+			memset(rxBuffer, 0, sizeof(rxBuffer));
 
-			// Affichage des résultats
-			printf("ADC: %u, Voltage: %lu mV, Current: %lu mA\r\n",
-					measure.adc_raw,
-					measure.voltage_mv,
-					measure.current_ma);
 
-			lastTick = currentTick;
 		}
-		/* USER CODE END WHILE */
 
-		/* USER CODE BEGIN 3 */
 	}
+	/* USER CODE END WHILE */
+
+	/* USER CODE BEGIN 3 */
+
 	/* USER CODE END 3 */
 }
 
@@ -260,6 +285,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 		conversionComplete = 1;
 	}
 }
+
 
 /* USER CODE END 4 */
 

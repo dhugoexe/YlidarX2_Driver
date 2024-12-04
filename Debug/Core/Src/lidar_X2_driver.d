@@ -34,6 +34,7 @@ Core/Src/lidar_X2_driver.o: ../Core/Src/lidar_X2_driver.c \
  ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim_ex.h \
  ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart.h \
  ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart_ex.h \
+ ../Core/Inc/tim.h \
  ../Drivers/CMSIS/Device/ST/STM32G4xx/Include/stm32g431xx.h
 ../Core/Inc/lidar_X2_driver.h:
 ../Core/Inc/usart.h:
@@ -72,4 +73,5 @@ Core/Src/lidar_X2_driver.o: ../Core/Src/lidar_X2_driver.c \
 ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim_ex.h:
 ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart.h:
 ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart_ex.h:
+../Core/Inc/tim.h:
 ../Drivers/CMSIS/Device/ST/STM32G4xx/Include/stm32g431xx.h:
