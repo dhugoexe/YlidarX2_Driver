@@ -1,0 +1,9 @@
+../Core/Src/lidar_X2_driver.c:12:5:init_lidar	4
+../Core/Src/lidar_X2_driver.c:26:15:lidar_scan	4
+../Core/Src/lidar_X2_driver.c:44:15:lidar_DataProcessing	1
+../Core/Src/lidar_X2_driver.c:56:7:lidar_calculatingDistance	2
+../Core/Src/lidar_X2_driver.c:67:7:lidar_calculatingAngle	2
+../Core/Src/lidar_X2_driver.c:82:5:lidar_checksum	2
+../Core/Src/lidar_X2_driver.c:94:6:HAL_UART_RxCpltCallback	2
+../Core/Src/lidar_X2_driver.c:103:6:lidar_motorSpeed	1
+../Core/Src/lidar_X2_driver.c:108:15:lidar_extractDataFromTrame	5
