@@ -58,7 +58,6 @@
 extern DMA_HandleTypeDef hdma_adc1;
 extern TIM_HandleTypeDef htim1;
 extern TIM_HandleTypeDef htim16;
-extern DMA_HandleTypeDef hdma_usart3_rx;
 extern UART_HandleTypeDef huart3;
 /* USER CODE BEGIN EV */
 
@@ -217,20 +216,6 @@ void DMA1_Channel1_IRQHandler(void)
 }
 
 /**
-  * @brief This function handles DMA1 channel2 global interrupt.
-  */
-void DMA1_Channel2_IRQHandler(void)
-{
-  /* USER CODE BEGIN DMA1_Channel2_IRQn 0 */
-
-  /* USER CODE END DMA1_Channel2_IRQn 0 */
-  HAL_DMA_IRQHandler(&hdma_usart3_rx);
-  /* USER CODE BEGIN DMA1_Channel2_IRQn 1 */
-
-  /* USER CODE END DMA1_Channel2_IRQn 1 */
-}
-
-/**
   * @brief This function handles TIM1 break interrupt and TIM15 global interrupt.
   */
 void TIM1_BRK_TIM15_IRQHandler(void)
@@ -299,21 +284,6 @@ void USART3_IRQHandler(void)
   /* USER CODE BEGIN USART3_IRQn 1 */
 
   /* USER CODE END USART3_IRQn 1 */
-}
-
-/**
-  * @brief This function handles DMAMUX overrun interrupt.
-  */
-void DMAMUX_OVR_IRQHandler(void)
-{
-  /* USER CODE BEGIN DMAMUX_OVR_IRQn 0 */
-
-  /* USER CODE END DMAMUX_OVR_IRQn 0 */
-  // Handle DMA1_Channel2
-  HAL_DMAEx_MUX_IRQHandler(&hdma_usart3_rx);
-  /* USER CODE BEGIN DMAMUX_OVR_IRQn 1 */
-
-  /* USER CODE END DMAMUX_OVR_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */

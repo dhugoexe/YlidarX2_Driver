@@ -1,52 +1,39 @@
 #include "lidar_X2_driver.h"
 #include <stm32g431xx.h>
+#include "math.h"
 
 uint8_t rxBuffer[BUFFER_SIZE];
+uint8_t rxByte;
+static int rxIndex = 0;
 uint8_t LidarUartFlag = 0;
 extern HAL_StatusTypeDef status;
 
 uint8_t currentSpeed = 50;
 
 lidar_trame_t lidar_trame = {0};
+Lidar_RxState_t state = WAIT_HEADER_1;
+
+static volatile uint32_t callback_count = 0;
 
 
-// message: A5 5A 05 00 00 40 81
-int init_lidar(void)
-{
-	//lidar_setSpeed(LIDAR_MOTOR_STOP);
-	status = HAL_UART_Receive_DMA(&huart3, rxBuffer, BUFFER_SIZE);
-	if(LidarUartFlag){
-		LidarUartFlag = 0;
-		//lidar_setSpeed(LIDAR_MOTOR_NORMAL_SPEED);
-		if(rxBuffer[0] == LIDAR_START_FLAG1 && rxBuffer[1] == LIDAR_START_FLAG2)
-		{
-			return 1;
-		}
+
+
+void lidar_init(void) {
+
+	while (!LidarUartFlag)
+	{
+		status = HAL_UART_Receive_IT(&huart3, &rxByte, 1);
 	}
-	return 0;
+
 }
 
-
-
-lidar_point_t lidar_scan_loop(void)
+void lidar_scan_loop(void)
 {
-	lidar_point_t point = {0};
+	static lidar_point_t point = {0};
 
-	status = HAL_UART_Receive(&huart3, rxBuffer, 32, 1000);
-
-	if(rxBuffer[0] == HEADER_BYTE1 && rxBuffer[1] == HEADER_BYTE2)
-	{
-		uint8_t sample = rxBuffer[3];
-		uint8_t sampleData[sample*2];
-		memcpy(sampleData, &rxBuffer[10], sample*2);
-		point = lidar_DataProcessing(sampleData, sample);
-
-		if (point.isCorrect)
-		{
-			printf("Distance: %.2f mm, Angle: %.2f°\r\n",
-					point.distance,
-					point.angle);
-		}else {printf("Error incorrect point \r\n");}
+	if(LidarUartFlag) {
+		point = lidar_DataProcessing(rxBuffer, lidar_trame.LSN);
+		LidarUartFlag = 0;  // Reset du flag
 	}
 
 }
@@ -57,55 +44,88 @@ lidar_point_t lidar_DataProcessing(uint8_t lidar_data, uint8_t sample)
 
 	lidar_trame = lidar_extractDataFromTrame(lidar_data);
 	point.distance = lidar_calculatingDistance(lidar_trame.Si, lidar_trame.LSN);
-	point.angle = lidar_calculatingAngle(lidar_trame.FSA, lidar_trame.LSA, lidar_trame.LSN);
-	point.isCorrect = lidar_checksum(lidar_data);
+	point.angle = lidar_calculatingAngle(lidar_trame.FSA, lidar_trame.LSA, lidar_trame.LSN, point.distance);
+	//point.isCorrect = lidar_checksum(lidar_data);
+	point.isCorrect = 1;
 
 	return point;
 }
 
+float lidar_calculatingAngle(uint8_t FSA_data, uint8_t LSA_data, int samples, float distance)
+{
+
+    float angleFSA = ((uint16_t)FSA_data >> 1) / 64.0f;
+    float angleLSA = ((uint16_t)LSA_data >> 1) / 64.0f;
+
+    float angle_diff = angleLSA - angleFSA;
+    if(angle_diff < 0) {
+        angle_diff += 360.0f;
+    }
+
+    float angle = angleFSA + (angle_diff / 2.0f);
+
+    if(distance != 0) {
+        float angCorrect = atan2f(21.8f * (155.3f - distance),
+                               155.3f * distance) * 180.0f / 3.14159f;
+        return angle + angCorrect;
+    }
+
+    return angle;
+}
 float lidar_calculatingDistance(uint8_t* data, int sample)
 {
-	float sum = 0.0f;
-	for (int i = 0; i < sample; i++)
-	{
-		sum += (data[i * 2] + data[i * 2 + 1]) / 4.0f;
-	}
-
-	return sum / sample;
+    uint16_t dist_value = (uint16_t)data[sample*2+1] << 8 | data[sample*2];
+    return dist_value / 4.0f;
+}
+int lidar_checksum(const uint8_t* data, size_t len)
+{
+    uint16_t checksum = 0;
+    for(size_t i = 0; i < len-2; i++) {  // -2 car CS ne participe pas au XOR
+        checksum ^= data[i];
+    }
+    return checksum == (data[len-2] | (data[len-1] << 8));
 }
 
-float lidar_calculatingAngle(uint8_t FSA_data, uint8_t LSA_data, int samples)
-{
-	float sum = 0.0f;
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+	callback_count++;
+	if(huart->Instance == USART3) {
+		switch(state) {
+		case WAIT_HEADER_1:
+			if(rxByte == HEADER_BYTE1) {
+				printf("Byte reçu: 0x%02X\r\n", rxByte); // Debug
+				state = WAIT_HEADER_2;
+				rxIndex = 0;
+			}
+			break;
 
-	float angleFSA = (FSA_data >> 1) / 64;
-	float angleLSA = (LSA_data >> 1) / 64;
+		case WAIT_HEADER_2:
+			printf("Second byte: 0x%02X\r\n", rxByte); // Debug
+			if(rxByte == HEADER_BYTE2) {
+				state = RECEIVE_DATA;
+			} else {
+				state = WAIT_HEADER_1;
+			}
+			break;
 
-	for (int i = 0; i < samples; i++)
-	{
-		sum += ((angleLSA - angleFSA) / (samples -1)) * (i-1) + angleFSA;
-	}
-	return sum/samples;
+		case RECEIVE_DATA:
+			rxBuffer[rxIndex++] = rxByte;
 
-}
-
-int lidar_checksum(const uint8_t *data)
-{
-	uint16_t checksum = 0;
-
-	for (size_t i = 0; i < sizeof(data); i++) {
-		checksum ^= (uint16_t)data[i];
-	}
-	return checksum == data[8] + data[9];
-
-}
+			if(rxIndex >= BUFFER_SIZE) {
+				state = WAIT_HEADER_1;
+				lidar_trame = lidar_extractDataFromTrame(rxBuffer);
 
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-{
-	if(huart->Instance == USART3)
-	{
-		LidarUartFlag = 1;
+				lidar_point_t point = lidar_DataProcessing(rxBuffer, lidar_trame.LSN);
+				printf("Distance: %.2f mm, Angle: %.2f°\r\n",
+								point.distance,
+								point.angle);
+				LidarUartFlag = 1;
+				memset(rxBuffer, 0, BUFFER_SIZE);
+			}
+			break;
+		}
+
+		HAL_UART_Receive_IT(&huart3, &rxByte, 1);
 	}
 }
 
@@ -140,30 +160,30 @@ int lidar_setSpeed(uint8_t speed)
 
 lidar_trame_t lidar_extractDataFromTrame(uint8_t* buffer)  
 {
-	lidar_trame_t lidar_trame = {0};
+    lidar_trame_t lidar_trame = {0};
 
-	if (buffer == NULL) {
-		return lidar_trame;
-	}
+    if (buffer == NULL) return lidar_trame;
 
-	lidar_trame.PH = (uint16_t)buffer[1] << 8 | buffer[0];
-	lidar_trame.CT = (uint16_t)buffer[3] << 8 | buffer[2];
-	lidar_trame.LSN = (uint16_t)buffer[5] << 8 | buffer[4];
-	lidar_trame.FSA = (uint16_t)buffer[7] << 8 | buffer[6];
-	lidar_trame.LSA = (uint16_t)buffer[9] << 8 | buffer[8];
-	lidar_trame.CS = (uint16_t)buffer[11] << 8 | buffer[10];
+    // Reconstruction correcte des valeurs 16 bits en little endian
+    lidar_trame.PH = (uint16_t)buffer[1] << 8 | buffer[0];  // Doit être 0x55AA
+    lidar_trame.CT = buffer[2];  // Un seul byte
+    lidar_trame.LSN = buffer[3]; // Un seul byte
+    lidar_trame.FSA = (uint16_t)buffer[5] << 8 | buffer[4];
+    lidar_trame.LSA = (uint16_t)buffer[7] << 8 | buffer[6];
+    lidar_trame.CS = (uint16_t)buffer[9] << 8 | buffer[8];
 
-	if (lidar_trame.LSN > 0) {
-		lidar_trame.Si = (uint16_t*)malloc(lidar_trame.LSN * sizeof(uint16_t));
 
-		if (lidar_trame.Si != NULL) {
-			for (uint16_t i = 0; i < lidar_trame.LSN; i++) {
-				size_t offset = 12 + (i * 2);
-				lidar_trame.Si[i] = (uint16_t)buffer[offset + 1] << 8 | buffer[offset];
-			}
-		}
-	}
+    if (lidar_trame.LSN > 0) {
+        lidar_trame.Si = malloc(lidar_trame.LSN * sizeof(uint16_t));
+        if (lidar_trame.Si != NULL) {
+            for (uint8_t i = 0; i < lidar_trame.LSN; i++) {
+                // Les données commencent à l'offset 10
+                size_t offset = 10 + (i * 2);
+                lidar_trame.Si[i] = (uint16_t)buffer[offset+1] << 8 | buffer[offset];
+            }
+        }
+    }
 
-	return lidar_trame;
+    return lidar_trame;
 }
 

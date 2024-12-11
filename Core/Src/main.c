@@ -49,15 +49,6 @@
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 
-#define START_BYTE 0xA5
-#define START_SCAN 0x60
-#define STOP_SCAN 0x65
-#define DEVICE_INFO 0x90
-#define HEALTH_STATUS 0x91
-#define ADC_VREF_MV 3300           // 3.3V en millivolts
-#define ADC_RESOLUTION 4096        // 12-bit resolution
-#define SHUNT_RESISTANCE_MOHM 100  // 0.1Ω = 100mΩ
-#define GAIN_AMPLIFIER 20
 
 /* USER CODE END PM */
 
@@ -69,24 +60,6 @@ extern uint8_t LidarUartFlag;
 extern UART_HandleTypeDef huart3;
 
 HAL_StatusTypeDef status;
-
-#define ADC_BUF_SIZE 16
-static volatile uint16_t adc_buffer[ADC_BUF_SIZE];
-static volatile uint16_t adcValue = 0;
-static volatile uint8_t conversionComplete = 0;
-
-// Constantes pour éviter les calculs flottants
-#define ADC_VREF_MV 3300    // 3.3V en millivolts
-#define ADC_RESOLUTION 4096  // 12-bit resolution
-
-typedef struct {
-	uint16_t adc_raw;
-	uint32_t voltage_mv;
-	uint32_t current_ma;
-} Current_Measure_t;
-
-static Current_Measure_t currentMeasure = {0};
-
 
 /* USER CODE END PV */
 
@@ -145,20 +118,7 @@ int main(void)
 
 	printf("Starting DMA... \r\n");
 
-	HAL_TIM_Base_Start(&htim16);
-	HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
-	if (HAL_OK != HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_buffer, ADC_BUF_SIZE))
-	{
-		printf("HAL_ERROR\r\n");
-		Error_Handler();
-	}else( printf("HAL_OK\r\n"));
-
-	uint32_t lastTick = HAL_GetTick();
-	const uint32_t PRINT_INTERVAL = 1000;
-
-	lidar_point_t current_point;
-	uint8_t lidar_initialized = 0;
-
+	lidar_init();
 	/*
 	while (!lidar_initialized)
 	{
@@ -181,22 +141,12 @@ int main(void)
 	{
 
 		//lidar_scan_loop();
-		status = HAL_UART_Receive(&huart3, rxBuffer, 32, 1000);
-		HAL_Delay(10);
-		if(rxBuffer[0] == 0xAA && rxBuffer[1] == 0x55)
-		{
-			uint8_t sample = rxBuffer[3];
-			uint8_t sampleData[sample*2];
-			memcpy(sampleData, &rxBuffer[10], sample*2);
-			point = lidar_DataProcessing(sampleData, sample);
-
-			printf("Distance: %.2f mm, Angle: %.2f°\r\n",
-					point.distance,
-					point.angle);
-			memset(rxBuffer, 0, sizeof(rxBuffer));
 
 
-		}
+
+
+
+
 
 	}
 	/* USER CODE END WHILE */
@@ -254,35 +204,12 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 
-static void Calculate_Current(Current_Measure_t *measure, uint16_t adc_value)
-{
-	measure->adc_raw = adc_value;
-
-	// Calcul de la tension en mV
-	measure->voltage_mv = ((uint32_t)adc_value * ADC_VREF_MV) / ADC_RESOLUTION;
-
-	// Calcul du courant en mA
-	// I = V / (R * G) où G est le gain de l'amplificateur
-	// Pour éviter les divisions flottantes, on multiplie d'abord par 1000 pour avoir des mA
-	measure->current_ma = (measure->voltage_mv * 1000) /
-			(SHUNT_RESISTANCE_MOHM * GAIN_AMPLIFIER);
-}
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
 	if(hadc->Instance == ADC1)
 	{
-		// Calcul de la moyenne
-		uint32_t sum = 0;
-		for (uint16_t i = 0; i < ADC_BUF_SIZE; i++)
-		{
-			sum += adc_buffer[i];
-		}
-		uint16_t avgADC = sum / ADC_BUF_SIZE;
 
-		// Calcul du courant et mise à jour des mesures
-		Calculate_Current(&currentMeasure, avgADC);
-		conversionComplete = 1;
 	}
 }
 

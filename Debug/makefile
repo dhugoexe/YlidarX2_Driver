@@ -60,8 +60,8 @@ all: main-build
 main-build: Lidar_dev.elf secondary-outputs
 
 # Tool invocations
-Lidar_dev.elf Lidar_dev.map: $(OBJS) $(USER_OBJS) /home/ese/Projects/YlidarX2_Driver/STM32G431RBTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "Lidar_dev.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"/home/ese/Projects/YlidarX2_Driver/STM32G431RBTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Lidar_dev.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Lidar_dev.elf Lidar_dev.map: $(OBJS) $(USER_OBJS) /home/dov911/Projects/YlidarX2_Driver/STM32G431RBTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "Lidar_dev.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"/home/dov911/Projects/YlidarX2_Driver/STM32G431RBTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Lidar_dev.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
