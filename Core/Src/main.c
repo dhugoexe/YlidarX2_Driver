@@ -129,24 +129,13 @@ int main(void)
 
 	 */
 
-
-
-	uint8_t rxBuffer[32];
-	lidar_point_t point = {0};
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
 	while (1)
 	{
-
-		//lidar_scan_loop();
-
-
-
-
-
-
+		lidar_scan_loop();
 
 	}
 	/* USER CODE END WHILE */
